@@ -400,10 +400,6 @@ void interpreter::eval_lread() {
 void interpreter::eval_lwrite() {
     int32_t value = pop();
 
-    if (unbox(value) == 509) {
-        int t = 9;
-    }
-
     push(Lwrite(value));
 }
 
@@ -423,7 +419,6 @@ void interpreter::eval_barray() {
     stack_top += len;
     push(result);
 }
-
 
 void interpreter::eval_closure() {
     int32_t offset = get_int();

@@ -1600,7 +1600,7 @@ extern int Lread () {
 
   printf ("> "); 
   fflush (stdout);
-  scanf  ("%d", &result);
+  int err = scanf  ("%d", &result);
 
   return BOX(result);
 }
