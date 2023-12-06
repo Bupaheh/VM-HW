@@ -302,7 +302,6 @@ void interpreter::eval_fail() {
 }
 
 void interpreter::eval_line() {
-    // TODO
     get_int();
 }
 
@@ -394,12 +393,8 @@ void interpreter::eval_callc() {
 
 
 void interpreter::eval() {
-    int cnt = 0;
-
     while (ip != nullptr) {
         char x = get_byte(), h = (x & 0xF0) >> 4, l = x & 0x0F;
-
-//        std::cout << cnt++ << std::endl;
 
         switch (h) {
             case 15:
