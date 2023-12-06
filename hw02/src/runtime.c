@@ -881,6 +881,22 @@ extern int Lcompare (void *p, void *q) {
   }
 }
 
+extern void* Belem_closure (void *p, int i) {
+    data *a = (data *)BOX(NULL);
+
+    ASSERT_BOXED(".elem:1", p);
+    ASSERT_UNBOXED(".elem:2", i);
+
+    a = TO_DATA(p);
+    i = UNBOX(i);
+
+    if (TAG(a->tag) == STRING_TAG) {
+        return a->contents + i;
+    }
+
+    return ((int*) a->contents) + i;
+}
+
 extern void* Belem (void *p, int i) {
   data *a = (data *)BOX(NULL);
 
@@ -1003,6 +1019,49 @@ extern void* Lstring (void *p) {
   return s;
 }
 
+extern void* Bclosure_arr (int bn, void *entry, int *values) {
+    int     i, ai;
+    register int * ebp asm ("ebp");
+    size_t  *argss;
+    data    *r;
+    int     n = UNBOX(bn);
+
+    __pre_gc ();
+#ifdef DEBUG_PRINT
+    indent++; print_indent ();
+  printf ("Bclosure: create n = %d\n", n); fflush(stdout);
+#endif
+    argss = (ebp + 12);
+    for (i = 0; i<n; i++, argss++) {
+        push_extra_root ((void**)argss);
+    }
+
+    r = (data*) alloc (sizeof(int) * (n+2));
+
+    r->tag = CLOSURE_TAG | ((n + 1) << 3);
+    ((void**) r->contents)[0] = entry;
+
+    for (i = 0; i<n; i++) {
+        ai = values[i];
+        ((int*)r->contents)[i+1] = ai;
+    }
+
+    __post_gc();
+
+    argss--;
+    for (i = 0; i<n; i++, argss--) {
+        pop_extra_root ((void**)argss);
+    }
+
+#ifdef DEBUG_PRINT
+    print_indent ();
+  printf ("Bclosure: ends\n", n); fflush(stdout);
+  indent--;
+#endif
+
+    return r->contents;
+}
+
 extern void* Bclosure (int bn, void *entry, ...) {
   va_list args; 
   int     i, ai;
@@ -1051,6 +1110,33 @@ extern void* Bclosure (int bn, void *entry, ...) {
   return r->contents;
 }
 
+extern void* Barray_arr (int bn, int *data_) {
+    int     i, ai;
+    data    *r;
+    int     n = UNBOX(bn);
+
+    __pre_gc ();
+
+#ifdef DEBUG_PRINT
+    indent++; print_indent ();
+  printf ("Barray: create n = %d\n", n); fflush(stdout);
+#endif
+    r = (data*) alloc (sizeof(int) * (n+1));
+
+    r->tag = ARRAY_TAG | (n << 3);
+
+    for (i = 0; i<n; i++) {
+        ai = *(data_++);
+        ((int*)r->contents)[i] = ai;
+    }
+
+    __post_gc();
+#ifdef DEBUG_PRINT
+    indent--;
+#endif
+    return r->contents;
+}
+
 extern void* Barray (int bn, ...) {
   va_list args; 
   int     i, ai; 
@@ -1081,6 +1167,47 @@ extern void* Barray (int bn, ...) {
   indent--;
 #endif
   return r->contents;
+}
+
+extern void* Bsexp_arr (int bn, int tag, int *values) {
+    int     i;
+    int     ai;
+    size_t *p;
+    sexp   *r;
+    data   *d;
+    int n = UNBOX(bn);
+
+    __pre_gc () ;
+
+#ifdef DEBUG_PRINT
+    indent++; print_indent ();
+  printf("Bsexp: allocate %zu!\n",sizeof(int) * (n+1)); fflush (stdout);
+#endif
+    r = (sexp*) alloc (sizeof(int) * (n+1));
+    d = &(r->contents);
+    r->tag = 0;
+
+    d->tag = SEXP_TAG | ((n-1) << 3);
+
+    for (i=0; i<n-1; i++) {
+        ai = *(values++);
+
+        p = (size_t*) ai;
+        ((int*)d->contents)[i] = ai;
+    }
+
+    r->tag = UNBOX(tag);
+
+#ifdef DEBUG_PRINT
+    r->tag = SEXP_TAG | ((r->tag) << 3);
+  print_indent ();
+  printf("Bsexp: ends\n"); fflush (stdout);
+  indent--;
+#endif
+
+    __post_gc();
+
+    return d->contents;
 }
 
 extern void* Bsexp (int bn, ...) {
@@ -1213,7 +1340,7 @@ extern void* Bsta (void *v, int i, void *x) {
     return v;
   }
 
-  * (void**) x = v;
+  * (void**) i = v;
 
   return v;
 }

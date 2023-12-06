@@ -1,12 +1,15 @@
 CC=gcc
 CXX=g++
-CFLAGS:=-I include -O2 -m32 -g -fstack-protector-all
+CFLAGS:=-I include -O0 -m32 -g -fstack-protector-all
 
-all: build/main.o build/gc_runtime.o build/byterun.o build/runtime.o
-	$(CXX) -g -m32 build/gc_runtime.o build/runtime.o build/byterun.o build/main.o -o build/main
+all: build/main.o build/gc_runtime.o build/byterun.o build/runtime.o build/interpreter.o
+	$(CXX) -g -m32 build/gc_runtime.o build/runtime.o build/byterun.o build/interpreter.o build/main.o -o build/main
 
-build/main.o: build src/main.cpp include/runtime.h include/byterun.h
+build/main.o: build src/main.cpp include/interpreter.h
 	$(CXX) $(CFLAGS) -c src/main.cpp -o build/main.o
+
+build/interpreter.o: build src/interpretator.cpp include/runtime.h include/byterun.h
+	$(CXX) $(CFLAGS) -c src/interpreter.cpp -o build/interpreter.o
 
 build/byterun.o: build src/byterun.c include/byterun.h
 	$(CC) $(CFLAGS) -c src/byterun.c -o build/byterun.o

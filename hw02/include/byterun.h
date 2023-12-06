@@ -22,3 +22,5 @@ char* get_public_name (bytefile *f, int i);
 
 /* Gets an offset for a publie symbol */
 int get_public_offset (bytefile *f, int i);
+
+void disassemble (FILE *f, bytefile *bf);
