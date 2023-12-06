@@ -10,6 +10,7 @@ extern "C" {
     extern int LtagHash (char *s);
     extern void* Bsta (void *v, int i, void *x);
     extern void* Belem (void *p, int i);
+    extern void* Belem_closure (void *p, int i);
     extern int Btag (void *d, int t, int n);
     extern int Barray_patt (void *d, int n);
     extern int Bstring_patt (void *x, void *y);
@@ -23,10 +24,8 @@ extern "C" {
     extern int Lwrite(int);
     extern int Llength(void*);
     extern void* Lstring (void *p);
-    extern void* Barray_arr (int bn, int *data_);
+    extern void* Barray_arr (int bn, int *values);
     extern void* Bclosure_arr (int bn, void *entry, int *values);
-
-    extern void* Belem_closure (void *p, int i);
 }
 
 void *__start_custom_data;
@@ -53,20 +52,16 @@ bool is_boxed(int32_t value) {
 }
 
 interpreter::interpreter(std::string file_path) :
-    stack_bottom(__gc_stack_bottom),
-    stack_top(__gc_stack_top),
-    bf(read_file(file_path.data())),
-    ip(bf->code_ptr)
+        stack_bottom(__gc_stack_bottom),
+        stack_top(__gc_stack_top),
+        bf(read_file(file_path.data())),
+        ip(bf->code_ptr)
 {
     __init();
 
-    FILE *f = fopen("bytecode.txt", "w");
-    disassemble(f, bf);
-    fclose(f);
-
-    stack_bottom = (new int32_t[STACK_CAPACITY]) + STACK_CAPACITY;
-    stack_top = stack_bottom;
-    fp = stack_bottom;
+    stack_top = (new int32_t[STACK_CAPACITY]) + STACK_CAPACITY;
+    stack_bottom = stack_top;
+    fp = stack_top;
 
     push(0);
     push(0);
@@ -76,7 +71,7 @@ interpreter::interpreter(std::string file_path) :
 interpreter::~interpreter() {
     free(bf->global_ptr);
     free(bf);
-    delete[] (stack_top - STACK_CAPACITY);
+    delete[] (stack_bottom - STACK_CAPACITY);
 }
 
 int32_t *interpreter::global(int32_t i) {
@@ -91,9 +86,15 @@ int32_t *interpreter::arg(int32_t i) {
     return fp + i + 3;
 }
 
-int32_t *interpreter::lookup(char l, int32_t i) {
-    int32_t *result;
+int32_t *interpreter::binded(int32_t i) {
+    int32_t nargs = *(fp + 1);
+    auto id = reinterpret_cast<int32_t *>(*arg(nargs - 1));
+    auto result = reinterpret_cast<int32_t>(Belem_closure(id, box(i + 1)));
 
+    return reinterpret_cast<int32_t *>(result);
+}
+
+int32_t *interpreter::lookup(char l, int32_t i) {
     switch (l) {
         case 0:
             return global(i);
@@ -106,6 +107,8 @@ int32_t *interpreter::lookup(char l, int32_t i) {
         default:
             failure("Unexpected location: %d", l);
     }
+
+    return nullptr;
 }
 
 void interpreter::jmp(int32_t offset) {
@@ -113,7 +116,7 @@ void interpreter::jmp(int32_t offset) {
 }
 
 void interpreter::reverse(int32_t n) {
-    int32_t *bot = stack_bottom;
+    int32_t *bot = stack_top;
     int32_t *top = bot + n - 1;
 
     while (bot < top) {
@@ -137,15 +140,15 @@ char *interpreter::get_str() {
 }
 
 int32_t interpreter::peek(int32_t pos) {
-    return stack_bottom[pos];;
+    return stack_top[pos];;
 }
 
 int32_t interpreter::pop() {
-    return *(stack_bottom++);
+    return *(stack_top++);
 }
 
 void interpreter::push(int32_t value) {
-    *(--stack_bottom) = value;
+    *(--stack_top) = value;
 }
 
 int32_t interpreter::pop_int() {
@@ -223,8 +226,8 @@ void interpreter::eval_sexp() {
     int32_t tag = LtagHash(s);
 
     reverse(len);
-    auto result = reinterpret_cast<int32_t>(Bsexp_arr(box(len + 1), tag, stack_bottom));
-    stack_bottom += len;
+    auto result = reinterpret_cast<int32_t>(Bsexp_arr(box(len + 1), tag, stack_top));
+    stack_top += len;
     push(result);
 }
 
@@ -306,17 +309,17 @@ void interpreter::eval_begin() {
     int32_t nlocals = get_int();
 
     push(reinterpret_cast<int32_t>(fp));
-    fp = stack_bottom;
-    stack_bottom -= nlocals;
+    fp = stack_top;
+    stack_top -= nlocals;
 }
 
 void interpreter::eval_end() {
     int32_t result = pop();
-    stack_bottom = fp;
+    stack_top = fp;
     fp = reinterpret_cast<int32_t *>(pop());
     int32_t nargs = pop();
     ip = reinterpret_cast<char*>(pop());
-    stack_bottom += nargs;
+    stack_top += nargs;
     push(result);
 }
 
@@ -416,9 +419,35 @@ void interpreter::eval_lstring() {
 void interpreter::eval_barray() {
     int32_t len = get_int();
     reverse(len);
-    auto result = reinterpret_cast<int32_t>(Barray_arr(box(len), stack_bottom));
-    stack_bottom += len;
+    auto result = reinterpret_cast<int32_t>(Barray_arr(box(len), stack_top));
+    stack_top += len;
     push(result);
+}
+
+
+void interpreter::eval_closure() {
+    int32_t offset = get_int();
+    int32_t nargs = get_int();
+    int32_t args[nargs];
+
+    for (int i = 0; i < nargs; i++) {
+        char l = get_byte();
+        int value = get_int();
+        args[i] = *lookup(l, value);
+    }
+
+    void *result = Bclosure_arr(box(nargs), bf->code_ptr + offset, args);
+
+    push(reinterpret_cast<int32_t>(result));
+}
+
+void interpreter::eval_callc() {
+    int32_t nargs = get_int();
+    void *label = Belem(reinterpret_cast<int32_t*>(peek(nargs)), box(0));
+    reverse(nargs);
+    push(reinterpret_cast<int32_t>(ip));
+    push(nargs + 1);
+    ip = reinterpret_cast<char *>(label);
 }
 
 
@@ -582,40 +611,6 @@ void interpreter::eval() {
 
     }
 }
-
-void interpreter::eval_closure() {
-    int32_t offset = get_int();
-    int32_t nargs = get_int();
-    int32_t args[nargs];
-
-    for (int i = 0; i < nargs; i++) {
-        char l = get_byte();
-        int value = get_int();
-        args[i] = *lookup(l, value);
-    }
-
-    void *result = Bclosure_arr(box(nargs), bf->code_ptr + offset, args);
-
-    push(reinterpret_cast<int32_t>(result));
-}
-
-void interpreter::eval_callc() {
-    int32_t nargs = get_int();
-    void *label = Belem(reinterpret_cast<int32_t*>(peek(nargs)), box(0));
-    reverse(nargs);
-    push(reinterpret_cast<int32_t>(ip));
-    push(nargs + 1);
-    ip = reinterpret_cast<char *>(label);
-}
-
-int32_t *interpreter::binded(int32_t i) {
-    int32_t nargs = *(fp + 1);
-    auto id = reinterpret_cast<int32_t *>(*arg(nargs - 1));
-    auto result = reinterpret_cast<int32_t>(Belem_closure(id, box(i + 1)));
-
-    return reinterpret_cast<int32_t *>(result);
-}
-
 
 
 

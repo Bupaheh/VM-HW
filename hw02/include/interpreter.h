@@ -64,8 +64,8 @@ private:
     bytefile *bf;
     char *ip;
 
-    int32_t *&stack_top;
     int32_t *&stack_bottom;
+    int32_t *&stack_top;
     int32_t *fp;
 };
 

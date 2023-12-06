@@ -132,11 +132,11 @@ static void vfailure (char *s, va_list args) {
   exit     (255);
 }
 
-void failure (char *s, ...) {
+void failure (const char *s, ...) {
   va_list args;
 
   va_start (args, s);
-  vfailure (s, args);
+  vfailure ((char *) s, args);
 }
 
 void Lassert (void *f, char *s, ...) {
@@ -1110,7 +1110,7 @@ extern void* Bclosure (int bn, void *entry, ...) {
   return r->contents;
 }
 
-extern void* Barray_arr (int bn, int *data_) {
+extern void* Barray_arr (int bn, int *values) {
     int     i, ai;
     data    *r;
     int     n = UNBOX(bn);
@@ -1126,7 +1126,7 @@ extern void* Barray_arr (int bn, int *data_) {
     r->tag = ARRAY_TAG | (n << 3);
 
     for (i = 0; i<n; i++) {
-        ai = *(data_++);
+        ai = *(values++);
         ((int*)r->contents)[i] = ai;
     }
 
@@ -1441,7 +1441,7 @@ extern void* LgetEnv (char *var) {
   void *s;
   
   if (e == NULL)
-    return BOX(0);
+    return (void *) BOX(0);
 
   __pre_gc ();
 
@@ -1573,9 +1573,9 @@ extern void* Lfexists (char *fname) {
 
   f = fopen (fname, "r");
   
-  if (f) return BOX(1);
+  if (f) return (void *) BOX(1);
 
-  return BOX(0);
+  return (void *) BOX(0);
 }
 
 extern void* Lfst (void *v) {
