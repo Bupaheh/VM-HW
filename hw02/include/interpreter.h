@@ -1,5 +1,7 @@
 #pragma once
 
+#include "stack.h"
+
 extern "C" {
     #include "byterun.h"
 }
@@ -16,13 +18,7 @@ private:
     int32_t get_int();
     char *get_str();
 
-    int32_t pop();
-    int32_t peek(int32_t pos = 0);
-    void push(int32_t value);
-    int32_t pop_int();
-    void push_int(int32_t value);
     void jmp(int32_t offset);
-    void reverse(int32_t n);
 
     int32_t *global(int32_t i);
     int32_t *local(int32_t i);
@@ -61,11 +57,10 @@ private:
     void eval_closure();
     void eval_callc();
 
+    stack st = stack();
+
     bytefile *bf;
     char *ip;
-
-    int32_t *&stack_bottom;
-    int32_t *&stack_top;
     int32_t *fp;
 };
 
