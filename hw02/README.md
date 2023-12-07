@@ -7,5 +7,5 @@ make
 ## RUN
 
 ```
-./make BYTECODE_FILE_PATH
+./main BYTECODE_FILE_PATH
 ```
