@@ -23,5 +23,5 @@ build/gc_runtime.o: build src/gc_runtime.s
 build:
 	mkdir build
 
-clear:
+clean:
 	rm -r build
