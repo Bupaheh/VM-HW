@@ -57,11 +57,7 @@ private:
     void eval_closure();
     void eval_callc();
 
-    stack st = stack();
-
     bytefile *bf;
     char *ip;
     int32_t *fp;
 };
-
-void interpret(std::string file_path);
