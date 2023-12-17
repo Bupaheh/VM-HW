@@ -60,5 +60,8 @@ int main(int argc, char* argv[]) {
         disassemble_instruction(f, bf, t);
     }
 
+    free(bf->global_ptr);
+    free(bf);
+
     return 0;
 }
